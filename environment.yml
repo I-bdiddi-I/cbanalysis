@@ -1,0 +1,29 @@
+name: cbspec
+
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Core Python
+  - python=3.11
+
+  # Data handling
+  - numpy
+  - pandas
+  - pyarrow
+  - pyyaml
+  - awkward
+
+  # Plotting
+  - matplotlib
+
+  # Scientific utilities
+  - scipy
+
+  # Development tools
+  - pip
+  - pip:
+      - tqdm      # optional progress bars
+      - tabulate  # optional pretty-printing of tables
+      - git+https://github.com/usnistgov/FCpy

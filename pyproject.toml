@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cbanalysis"
+version = "0.1.0"
+description = "A project pipeline to perform TA-style analysis on TA cosmic ray data."
+authors = [
+    { name = "Robert D'Avignon", email = "rjdavignon@outlook.com" }
+]
+readme = "README.md"
+license = { text = "MIT" }
+keywords = ["uhecr", "spectrum", "telescope-array", "cosmic-rays", "analysis"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent"
+]
+requires-python = ">=3.10"
+
+dependencies = [
+    "numpy",
+    "awkward",
+    "pyarrow",
+    "pandas",
+    "matplotlib",
+    "scipy",
+    "pyyaml",
+    "tqdm",
+    "tabulate",
+    # FCpy installed from GitHub
+    "FCpy @ git+https://github.com/usnistgov/FCpy",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["cbanalysis*"]
+
+[project.scripts]
+cbspec = "cbanalysis.cli:main"
