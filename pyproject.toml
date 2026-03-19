@@ -40,4 +40,5 @@ where = ["src"]
 include = ["cbanalysis*"]
 
 [project.scripts]
-cbspec = "cbanalysis.cli:main"
+cbprocess = "cbanalysis.pipelines.cbprocess.cli:main"
+cbspec = "cbanalysis.pipelines.cbspec.cli:main"

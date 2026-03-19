@@ -1,16 +1,30 @@
 # cbanalysis
 
-**cbanalysis** is a modular, physics‑transparent Python package for converting 
-Telescope Array **TASD** or **CBSD** (checkerboard) surface-detector data into an 
-ultra‑high‑energy cosmic‑ray (UHECR) **flux** and  **E³J(E) spectrum**. 
+**cbanalysis** is a modular, physics‑transparent Python framework for 
+running multiple **Telescope Array-style pipelines** under a single unified
+CLI. 
 
-The pipeline is fully YAML-driven, modular, and reproducible.
-It produces publication-quality plots, Feldman-Cousins confidence intervals,
-and clean CSV outputs for downstream analysis.
+It is designed to host several independent pipelines - such as **cbspec** (UHECR
+spectrum), etc. - all sharing a consistent configuration system, directory
+structure, and logging model.
+
+The framework emphasizes:
+- explicit, reproducible physics logic
+- YAML-driven configuration
+- modular pipeline design
+- publication-quality outputs
 
 ---
+## Pipelines
 
-## Features
+### cbspec - UHECR Spectrum Pipeline
+The `cbspec` command runs a full TA-style spectrum analysis using TASD or CBSD
+surface-detector data.
+
+It performs:
+- parquet ingestion (MC + data)
+- automatic tree-type detection
+- TA-style quality cuts
 
 ### **Data ingestion & processing** 
 - Reads **parquet** files for MC and data 
