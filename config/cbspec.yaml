@@ -1,28 +1,10 @@
-# This file controls the entire spectrum pipeline:
-#  - array type
-#  - file paths
-#  - energy binning
-#  - geometry parameters
-#  - run times
-#  - quality cut parameters
-
- array:
-   # Choose between:
-   #   "TASD" - full Telescope Array surface detector
-   #   "CBSD" - checkerboarded Telescope Array surface detector (every-other detector)
-   type: "TASD" # or "CBSD"
-
- data:
-   # data paths
-   # TASD files
-   tasd:
-    mc_file: "data/tlfptn_1850.all.tlsdfit.result.parquet"
-    dt_file: "data/sddt.main.result.parquet"
-
-   # CBSD files
-   cbsd:
-    mc_file: "data/tlfptn_1850.tlsdfit.result.parquet"
-    dt_file: "data/sddt.cb.noCuts.result.parquet"
+# Configuration for the cbspec spectrum pipeline.
+# This pipeline:
+#  - loads processed energy arrays from cbprocess
+#  - computes exposure
+#  - computes flux
+#  - performs binning
+#  - produces spectrum plots
 
  energy:
   bins:
@@ -53,15 +35,6 @@
 
  run:
   time_s: 504921600. # 16 years of expirement run time in seconds
-
- quality_cuts:
-  number_of_good_sd: 5
-  theta_deg: 45.
-  boarder_dist_m: 1200.
-  geometry_chi2: 4.
-  ldf_chi2: 4.
-  ped_error: 5.
-  frac_s800: 0.25
 
  output:
   base_dir: "output"

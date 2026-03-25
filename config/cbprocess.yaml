@@ -1,10 +1,11 @@
-# This file controls the entire spectrum pipeline:
-#  - array type
-#  - file paths
-#  - energy binning
-#  - geometry parameters
-#  - run times
-#  - quality cut parameters
+# Configuration for cbprocess preprocessing pipeline.
+# This pipline:
+#  - selects MC/data parquet files
+#  - reads parquet in batches
+#  - applies TA-style quality cuts
+#  - computes reconstructed and thrown energies
+#  - saves CSVs and filtered Parquet files
+
 
  array:
    # Choose between:
@@ -13,7 +14,7 @@
    type: "TASD" # or "CBSD"
 
  data:
-   # data paths
+   # Parquet file paths for MC and data
    # TASD files
    tasd:
     mc_file: "data/tlfptn_1850.all.tlsdfit.result.parquet"
@@ -24,35 +25,13 @@
     mc_file: "data/tlfptn_1850.tlsdfit.result.parquet"
     dt_file: "data/sddt.cb.noCuts.result.parquet"
 
- energy:
-  bins:
-    - 18.0
-    - 18.1
-    - 18.2
-    - 18.3
-    - 18.4
-    - 18.5
-    - 18.6
-    - 18.7
-    - 18.8
-    - 18.9
-    - 19.0
-    - 19.1
-    - 19.2
-    - 19.3
-    - 19.4
-    - 19.5
-    - 19.6
-    - 19.8
-    - 20.0
-    - 20.3
-
- geometry:
-  generated_area_m2: 1.96349541e9 # Generated area (Dmitri's thesis) in meters squared: π (25 km)^2
-  generated_solid_angle_sr: 2.35619449 # Generated solid angle (Dmitri's thesis): 3π/4
-
- run:
-  time_s: 504921600. # 16 years of expirement run time in seconds
+ processing:
+  # Number of time periods ot split the data into:
+  #   1 → no splitting (all 16 years)
+  #   2 → first 8 years / last 8 years
+  #   3 → thirds
+  #   N → general case
+  periods: 1
 
  quality_cuts:
   number_of_good_sd: 5
