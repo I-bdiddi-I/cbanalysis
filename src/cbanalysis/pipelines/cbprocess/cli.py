@@ -6,6 +6,7 @@ Usage:
 Options:
     --config path/to/cbprocess.yaml
     --array_type TASD|CBSD
+    --periods int
 """
 
 import argparse
@@ -30,6 +31,13 @@ def parse_args():
         choices=["TASD", "CBSD"],
         help="Override array type (TASD or CBSD).",
     )
+
+    parser.add_argument(
+        "--periods",
+        type=int,
+        default=None,
+        help="Number of time periods to split the data into (default: from YAML)."
+    )
     return parser.parse_args()
 
 def main():
@@ -39,8 +47,12 @@ def main():
 
     array_cfg, spectrum_cfg, cuts_cfg, output_cfg, cfg = load_config(config_path)
 
+    # CLI overrides
     if args.array_type is not None:
         array_cfg.array_type = args.array_type
+
+    if args.periods is not None:
+        cfg["processing"]["periods"] = args.periods
 
     run_cbprocess(
         array_cfg=array_cfg,
@@ -49,3 +61,6 @@ def main():
         output_cfg=output_cfg,
         cfg=cfg,
     )
+
+    if __name__ == "__main__":
+        main()

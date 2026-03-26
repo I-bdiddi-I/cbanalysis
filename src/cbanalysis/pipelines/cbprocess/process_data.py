@@ -2,25 +2,31 @@
 All data ingestion and processing for cbprocess pipeline is handled here.
 
 This module performs the following tasks:
-    1. Read MC and data parquet files batch-wise
-    2. Detect the tree type automatically:
+    1. Reads MC and data parquet files batch-wise
+    2. Detects the tree type automatically:
         - resTree   → TASD standard reconstruction
         - tTlfit    → (need to remember what this is)
-    3. Apply FD energy correction and compute:
+    3. Applies FD energy correction and compute:
         - log10(E_recon/eV)
         - log10(E_thrown/eV) for MC
-    4. Apply TA-style quality cuts (configurable in YAML).
-    5. Accumulate:
+    4. Applies TA-style quality cuts (configurable in YAML).
+    5. Produces:
         - reconstructed MC log10(E/eV)
         - reconstructed data log10(E/eV)
-        - thrown MC log10(E/eV)
-    6. Log all steps to text + JSON logs
+        - thrown MC log10(E/eV) (no cuts)
+        - thrown MC log10(E/eV) (geom cuts)
+        - Full filtered data
+    6. (Optional) Splits all arrays into N time periods
+    7. (Optional) Computes data ranges for each period (yymmdd_min, yymmdd_max)
+    8. Logs all steps to text + JSON logs
 """
 
-from pathlib import Path
+
 import pyarrow.parquet as pq
 import numpy as np
 import pandas as pd
+import awkward as ak
+import pyarrow as pa
 
 from cbanalysis.utils.data_classes import QualityCuts
 from cbanalysis.utils.constants import fd_energy_corr, EeV_corr
@@ -70,7 +76,7 @@ def apply_quality_cuts(
     """
 
     # Reconstructed zenith angles with array-specific correction
-    theta = df["theta"].str[s] + theta_corr
+    theta = df["theta_corr"]
 
     # Fractional S800
     fs800 = dsc / sc
@@ -167,18 +173,29 @@ def process_batch(df, array_type, j_index, comp_df, cuts: QualityCuts, batch_idx
     logger.log_text(f"Detected tree type: {tree_type}")
     logger.log_json(event="tree_type", value=tree_type, batch=batch_idx)
 
-    # MC true energy
+    # Compute corrected zenith angle and save it
+    df["theta_corr"] = df["theta"].str[s] + theta_corr
+
+    # MC true energies
     mcen = df["mcenergy"] / fd_energy_corr
 
     # Compute log10 energies
     df['logen'] = np.log10(en) + EeV_corr
     df['mclogen'] = np.log10(mcen) + EeV_corr
 
-    # Save uncut MC thrown energies (only for j_index == 0 MC file)
+    # Save uncut and geom cut MC thrown energies (only for j_index == 0 MC file)
     if j_index == 0:
         comp_df[-1] = pd.concat([comp_df[-1], df['mclogen']], ignore_index=True)
+        geom_mask = (
+                (df["theta_corr"] < cuts.theta_deg) &
+                (bdist >= cuts.boarder_dist_m)
+        )
+        geom_thrown = df.loc[geom_mask, "mclogen"]
+    else:
+        geom_thrown = pd.Series([], dtype=float)
 
-    # Apply quality cuts
+
+    # Apply full quality cuts
     cdata = apply_quality_cuts(
         df=df,
         theta_corr=theta_corr,
@@ -197,14 +214,17 @@ def process_batch(df, array_type, j_index, comp_df, cuts: QualityCuts, batch_idx
 
     # Events accepted this batch
     accepted_now = len(cdata)
-
     logger.log_text(f"Number of accepted events in current loop: {accepted_now}")
     logger.log_json(event="batch_end", batch=batch_idx, accepted=accepted_now)
 
-    return comp_df[j_index], comp_df[-1], cdata
+    # Extract yymmdd for period splitting
+    dates = df["yymmdd"]
+    #print(years)
+
+    return comp_df[j_index], comp_df[-1], geom_thrown, cdata, dates
 
 
-def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogger):
+def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogger, periods):
     """
     Read MC and data parquet files and return:
         mc_array            = MC reconstructed log10(E/eV) np.ndarray
@@ -225,25 +245,77 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
                  Quality cut thresholds
     :param logger: RunLogger
                    Handles text + JSON logging
+    :param periods: int
     :return mc_array: np.ndarray
     :return dt_array: np.ndarray
     :return mc_thrown_array: np.ndarray
     """
+    # comp_df = [MC recon, DT recon, MC thrown]
     comp_df = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
+
+    # Period accumulators
+    mc_recon = [[] for _ in range(periods)]
+    dt_recon = [[] for _ in range(periods)]
+    mc_thrown = [[] for _ in range(periods)]
+    mc_geom = [[] for _ in range(periods)]
+
+    # Passed cuts data (stored as Awkward)
+    passed_cuts = []
+
+    # Period ranges
+    period_ranges = [(None, None) for _ in range(periods)]
+
+    # Determine year range for period splitting
+    global_date_min = None
+    global_date_max = None
+
+    for infile in infiles:
+        date_min = None
+        date_max = None
+
+        logger.log_text(f"For input file {infile}")
+        parquet_file = pq.ParquetFile(infile)
+
+        for rg in range(parquet_file.num_row_groups):
+            yymmdd_rg = parquet_file.read_row_group(rg, columns=["yymmdd"]).to_pandas()["yymmdd"]
+
+            if date_min is None:
+                date_min = yymmdd_rg.min()
+                date_max = yymmdd_rg.max()
+            else:
+                date_min = min(date_min, yymmdd_rg.min())
+                date_max = max(date_max, yymmdd_rg.max())
+
+            if global_date_min is None:
+                global_date_min = yymmdd_rg.min()
+                global_date_max = yymmdd_rg.max()
+            else:
+                global_date_min = min(global_date_min, yymmdd_rg.min())
+                global_date_max = max(global_date_max, yymmdd_rg.max())
+
+
+        total_span = date_max - date_min
+        logger.log_text(f"Date range: {date_min} → {date_max} ({total_span // 10000} years)")
+        logger.log_json(event=f"total_span_{infile}", value=int(total_span))
+
+    global_span = global_date_max - global_date_min
+    logger.log_text(f"Unified date range: {global_date_min} → {global_date_max} ({global_span // 10000} years)")
+    logger.log_json(event=f"global_span_", value=int(global_span))
+
 
     for j, infile in enumerate(infiles):
         logger.log_text(f"Input File: {infile}")
         logger.log_json(event="input_file", file=str(infile), index=j)
 
-        count = 0 # running total of accepted events in this file
         parquet_file = pq.ParquetFile(infile)
+        count = 0  # running total of accepted events in this file
 
         # Iterate through parquet batches
         for batch_idx, batch in enumerate(parquet_file.iter_batches(batch_size=160000)):
             df = batch.to_pandas()
 
             # Process batch
-            comp_df[j], comp_df[-1], cdata = process_batch(
+            comp_df[j], comp_df[-1], geom_thrown_batch, cdata, dates = process_batch(
                 df=df,
                 array_type=array_type,
                 j_index=j,
@@ -253,16 +325,63 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
                 logger=logger,
             )
 
+            # Period splitting (energies only, per file)
+            for k in range(periods):
+                start_date = global_date_min + (k * (global_span // periods))
+                end_date = (
+                    global_date_min + ((k + 1) * (global_span // periods))
+                    if k < periods - 1
+                    else global_date_max + 1
+                )
+                #print(start, end)
+                mask = (dates >= start_date) & (dates < end_date)
+
+                # MC recon (full cuts), MC thrown (uncut), MC thrown (geom cuts)
+                if j == 0:
+                    mc_recon[k].extend(cdata.loc[mask, "logen"].tolist())
+                    mc_thrown[k].extend(df.loc[mask, "mclogen"].tolist())
+                    mc_geom[k].extend(geom_thrown_batch.loc[mask].tolist())
+                    #print(mc_recon)
+
+                # DT recon (full cuts)
+                if j == 1:
+                    dt_recon[k].extend(cdata.loc[mask, "logen"].tolist())
+
+                    if len(cdata.loc[mask]) > 0:
+                        start_data = cdata.loc[mask, "yymmdd"].min()
+                        end_data = cdata.loc[mask, "yymmdd"].max()
+
+                        if period_ranges[k][0] is None:
+                            period_ranges[k] = (start_data, end_data)
+                        else:
+                            period_ranges[k] = (
+                                min(period_ranges[k][0], start_data),
+                                max(period_ranges[k][1], end_data)
+                            )
+
+                logger.log_text(
+                    f"Period {k}: MC={len(mc_recon[k])}, DT={len(dt_recon[k])}"
+                )
+
+            # Save all DT that has passed cuts
+            if j == 1:
+                table = pa.Table.from_pandas(cdata, preserve_index=False)
+                passed_cuts.append(ak.from_arrow(table))
+
             # Update running total
             accepted_now = len(cdata)
             count += accepted_now
-
             logger.log_text(f"Total number of accepted events from {infile}: {count}")
             logger.log_json(event="running_total", file=str(infile), total=count)
 
-    # Convert accumulated DataFrames to numpy arrays
-    mc_array = comp_df[0].to_numpy()
-    dt_array = comp_df[1].to_numpy()
-    mc_thrown_array = comp_df[-1].to_numpy()
+    # Combine passed cut data
+    passed_cuts_df = ak.concatenate(passed_cuts) if passed_cuts else ak.Array([])
 
-    return mc_array, dt_array, mc_thrown_array
+    return {
+        "mc_recon_fullcuts": mc_recon,
+        "dt_recon_fullcuts": dt_recon,
+        "mc_thrown_nocuts": mc_thrown,
+        "mc_thrown_geomcuts": mc_geom,
+        "passed_cuts_df": passed_cuts_df,
+        "period_ranges": period_ranges,
+    }

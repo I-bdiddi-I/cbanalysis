@@ -18,7 +18,7 @@ All arguments are optional -- if omitted, defaults come from YAML file.
 import argparse
 from pathlib import Path
 
-from .load_config import load_config
+from cbanalysis.utils.load_config import load_config
 from .main import run_pipeline
 
 
