@@ -1,4 +1,4 @@
-name: cbspec
+name: cbanalysis
 
 channels:
   - conda-forge

@@ -9,15 +9,15 @@ This module performs the following tasks:
     3. Applies FD energy correction and compute:
         - log10(E_recon/eV)
         - log10(E_thrown/eV) for MC
-    4. Applies TA-style quality cuts (configurable in YAML).
-    5. Produces:
-        - reconstructed MC log10(E/eV)
-        - reconstructed data log10(E/eV)
-        - thrown MC log10(E/eV) (no cuts)
-        - thrown MC log10(E/eV) (geom cuts)
-        - Full filtered data
-    6. (Optional) Splits all arrays into N time periods
-    7. (Optional) Computes data ranges for each period (yymmdd_min, yymmdd_max)
+    4. Applies TA-style quality cuts (configurable in YAML)
+    5. Produces period-split energy arrays (in log10(E/eV)):
+        - MC reconstructed (full cuts)
+        - DT reconstructed (full cuts)
+        - MC thrown (full cuts)
+        - MC thrown (no cuts)
+        - MC thrown (geom cuts)
+    6. Preserves full jagged event table (Awkward) for DT after cuts
+    7. Computes date ranges for each period (yymmdd_min, yymmdd_max)
     8. Logs all steps to text + JSON logs
 """
 
@@ -98,7 +98,7 @@ def apply_quality_cuts(
     # Returns the filtered DataFrame
     return df.loc[mask]
 
-def process_batch(df, array_type, j_index, comp_df, cuts: QualityCuts, batch_idx, logger: RunLogger):
+def process_batch(df, array_type, j_index, cuts: QualityCuts, batch_idx, logger: RunLogger):
     """
     Processes parquet data each batch.
 
@@ -185,14 +185,15 @@ def process_batch(df, array_type, j_index, comp_df, cuts: QualityCuts, batch_idx
 
     # Save uncut and geom cut MC thrown energies (only for j_index == 0 MC file)
     if j_index == 0:
-        comp_df[-1] = pd.concat([comp_df[-1], df['mclogen']], ignore_index=True)
+        thrown_nocuts = df["mclogen"]
         geom_mask = (
                 (df["theta_corr"] < cuts.theta_deg) &
                 (bdist >= cuts.boarder_dist_m)
         )
-        geom_thrown = df.loc[geom_mask, "mclogen"]
+        thrown_geomcuts = df.loc[geom_mask, "mclogen"]
     else:
-        geom_thrown = pd.Series([], dtype=float)
+        thrown_nocuts = pd.Series([], dtype=float)
+        thrown_geomcuts = pd.Series([], dtype=float)
 
 
     # Apply full quality cuts
@@ -209,8 +210,15 @@ def process_batch(df, array_type, j_index, comp_df, cuts: QualityCuts, batch_idx
         cuts=cuts,
     )
 
+    if j_index == 0:
+        # MC thrown energies that pass full cuts
+        thrown_fullcuts = df.loc[cdata.index, "mclogen"]
+    else:
+        thrown_fullcuts = pd.Series([], dtype=float)
+
     # Append reconstructed log10(E) from accepted events
-    comp_df[j_index] = pd.concat([comp_df[j_index], cdata["logen"]], ignore_index=True)
+    #comp_df[j_index] = pd.concat([comp_df[j_index], cdata["logen"]], ignore_index=True)
+    recon_fullcuts = cdata["logen"]
 
     # Events accepted this batch
     accepted_now = len(cdata)
@@ -221,7 +229,14 @@ def process_batch(df, array_type, j_index, comp_df, cuts: QualityCuts, batch_idx
     dates = df["yymmdd"]
     #print(years)
 
-    return comp_df[j_index], comp_df[-1], geom_thrown, cdata, dates
+    return (
+        recon_fullcuts,
+        thrown_nocuts,
+        thrown_fullcuts,
+        thrown_geomcuts,
+        cdata,
+        dates,
+    )
 
 
 def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogger, periods):
@@ -251,13 +266,16 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
     :return mc_thrown_array: np.ndarray
     """
     # comp_df = [MC recon, DT recon, MC thrown]
-    comp_df = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
+    #comp_df = [pd.DataFrame(), pd.DataFrame(), pd.DataFrame()]
 
     # Period accumulators
-    mc_recon = [[] for _ in range(periods)]
-    dt_recon = [[] for _ in range(periods)]
-    mc_thrown = [[] for _ in range(periods)]
-    mc_geom = [[] for _ in range(periods)]
+    energy = {
+        "mc_recon":  [[] for _ in range(periods)],
+        "dt_recon":  [[] for _ in range(periods)],
+        "mc_thrown_nocuts": [[] for _ in range(periods)],
+        "mc_thrown_fullcuts": [[] for _ in range(periods)],
+        "mc_thrown_geomcuts": [[] for _ in range(periods)],
+    }
 
     # Passed cuts data (stored as Awkward)
     passed_cuts = []
@@ -273,7 +291,7 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
         date_min = None
         date_max = None
 
-        logger.log_text(f"For input file {infile}")
+        logger.log_text(f"Scanning date range for input file {infile}...")
         parquet_file = pq.ParquetFile(infile)
 
         for rg in range(parquet_file.num_row_groups):
@@ -304,7 +322,7 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
 
 
     for j, infile in enumerate(infiles):
-        logger.log_text(f"Input File: {infile}")
+        logger.log_text(f"Processing file: {infile}")
         logger.log_json(event="input_file", file=str(infile), index=j)
 
         parquet_file = pq.ParquetFile(infile)
@@ -315,11 +333,17 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
             df = batch.to_pandas()
 
             # Process batch
-            comp_df[j], comp_df[-1], geom_thrown_batch, cdata, dates = process_batch(
+            (
+                recon_fullcuts,
+                thrown_nocuts,
+                thrown_fullcuts,
+                thrown_geomcuts,
+                cdata,
+                dates,
+            ) = process_batch(
                 df=df,
                 array_type=array_type,
                 j_index=j,
-                comp_df=comp_df,
                 cuts=cuts,
                 batch_idx=batch_idx,
                 logger=logger,
@@ -338,14 +362,15 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
 
                 # MC recon (full cuts), MC thrown (uncut), MC thrown (geom cuts)
                 if j == 0:
-                    mc_recon[k].extend(cdata.loc[mask, "logen"].tolist())
-                    mc_thrown[k].extend(df.loc[mask, "mclogen"].tolist())
-                    mc_geom[k].extend(geom_thrown_batch.loc[mask].tolist())
+                    energy["mc_recon"][k].extend(recon_fullcuts.loc[mask].tolist())
+                    energy["mc_thrown_nocuts"][k].extend(thrown_nocuts.loc[mask].tolist())
+                    energy["mc_thrown_fullcuts"][k].extend(thrown_fullcuts.loc[mask].tolist())
+                    energy["mc_thrown_geomcuts"][k].extend(thrown_geomcuts.loc[mask].tolist())
                     #print(mc_recon)
 
                 # DT recon (full cuts)
                 if j == 1:
-                    dt_recon[k].extend(cdata.loc[mask, "logen"].tolist())
+                    energy["dt_recon"][k].extend(recon_fullcuts.loc[mask].tolist())
 
                     if len(cdata.loc[mask]) > 0:
                         start_data = cdata.loc[mask, "yymmdd"].min()
@@ -360,7 +385,7 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
                             )
 
                 logger.log_text(
-                    f"Period {k}: MC={len(mc_recon[k])}, DT={len(dt_recon[k])}"
+                    f"Period {k}: MC={len(energy["mc_recon"][k])}, DT={len(energy["dt_recon"][k])}"
                 )
 
             # Save all DT that has passed cuts
@@ -378,10 +403,7 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
     passed_cuts_df = ak.concatenate(passed_cuts) if passed_cuts else ak.Array([])
 
     return {
-        "mc_recon_fullcuts": mc_recon,
-        "dt_recon_fullcuts": dt_recon,
-        "mc_thrown_nocuts": mc_thrown,
-        "mc_thrown_geomcuts": mc_geom,
+        "energy": energy,
         "passed_cuts_df": passed_cuts_df,
         "period_ranges": period_ranges,
     }

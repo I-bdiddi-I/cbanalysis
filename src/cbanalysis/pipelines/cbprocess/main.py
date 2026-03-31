@@ -10,6 +10,7 @@ This pipeline:
         - MC reconstructed log10(E/eV)
         - data reconstructed log10(E/eV)
         - MC thrown log10(E/eV) (no cuts)
+        - MC thrown log10(E/eV) (full cuts)
         - MC thrown log10(E/eV) (geom cuts)
         - filtered data
     6. Optionally splits all arrays into N time periods
@@ -26,6 +27,14 @@ from cbanalysis.utils.data_classes import ArrayConfig, SpectrumConfig, QualityCu
 from cbanalysis.utils.logging_utils import RunLogger
 #from cbanalysis.utils.output_utils import save_processed_arrays_csv
 from .process_data import set_up_energy_array
+
+import warnings
+warnings.filterwarnings(
+    "ignore",
+    category=RuntimeWarning,
+    message="divide by zero encountered in log10"
+)
+
 
 def _make_run_dir(output_cfg: OutputConfig):
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -78,6 +87,8 @@ def run_cbprocess(
         logger=logger,
     )
 
+    energy = results["energy"]
+
     logger.log_text(f"Saving results ...")
     logger.log_json(event="save_results")
 
@@ -94,39 +105,48 @@ def run_cbprocess(
         else:
             suffix = f"_{int(start):06d}_{int(end):06d}"
 
-        # MC reconstructed energies
+        # MC reconstructed energies (full cuts)
         mc_filename = f"{array_cfg.array_type}_mc_recon_cut{suffix}.csv"
-        pd.DataFrame({"log10(E/eV)": results["mc_recon_fullcuts"][k]}).to_csv(
+        pd.DataFrame({"log10(E/eV)": energy["mc_recon"][k]}).to_csv(
             output_cfg.base_dir / "data" / mc_filename, index=False
         )
-        pd.DataFrame({"log10(E/eV)": results["mc_recon_fullcuts"][k]}).to_csv(
+        pd.DataFrame({"log10(E/eV)": energy["mc_recon"][k]}).to_csv(
             run_dir / "data" / mc_filename, index=False
         )
 
-        # Data reconstructed energies
+        # Data reconstructed energies (full cuts)
         dt_filename = f"{array_cfg.array_type}_data_recon_cut{suffix}.csv"
-        pd.DataFrame({"log10(E/eV)": results["dt_recon_fullcuts"][k]}).to_csv(
+        pd.DataFrame({"log10(E/eV)": energy["dt_recon"][k]}).to_csv(
             output_cfg.base_dir / "data" / dt_filename, index=False
         )
-        pd.DataFrame({"log10(E/eV)": results["dt_recon_fullcuts"][k]}).to_csv(
+        pd.DataFrame({"log10(E/eV)": energy["dt_recon"][k]}).to_csv(
             run_dir / "data" / dt_filename, index=False
         )
 
         # MC thrown energies (no cuts)
         thrown_filename = f"{array_cfg.array_type}_mc_thrown_nocuts{suffix}.csv"
-        pd.DataFrame({"log10(E/eV)": results["mc_thrown_nocuts"][k]}).to_csv(
+        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_nocuts"][k]}).to_csv(
             output_cfg.base_dir / "data" / thrown_filename, index=False
         )
-        pd.DataFrame({"log10(E/eV)": results["mc_thrown_nocuts"][k]}).to_csv(
+        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_nocuts"][k]}).to_csv(
+            run_dir / "data" / thrown_filename, index=False
+        )
+
+        # MC thrown energies (full cuts)
+        thrown_filename = f"{array_cfg.array_type}_mc_thrown_fullcuts{suffix}.csv"
+        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_fullcuts"][k]}).to_csv(
+            output_cfg.base_dir / "data" / thrown_filename, index=False
+        )
+        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_fullcuts"][k]}).to_csv(
             run_dir / "data" / thrown_filename, index=False
         )
 
         # MC thrown energies (geom cuts)
         geom_filename = f"{array_cfg.array_type}_mc_thrown_geomcuts{suffix}.csv"
-        pd.DataFrame({"log10(E/eV)": results["mc_thrown_geomcuts"][k]}).to_csv(
+        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_geomcuts"][k]}).to_csv(
             output_cfg.base_dir / "data" / geom_filename, index=False
         )
-        pd.DataFrame({"log10(E/eV)": results["mc_thrown_geomcuts"][k]}).to_csv(
+        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_geomcuts"][k]}).to_csv(
             run_dir / "data" / geom_filename, index=False
         )
 
