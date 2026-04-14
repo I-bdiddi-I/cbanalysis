@@ -154,7 +154,7 @@ def load_config(config_path: Path):
             periods=proc["periods"],
             en_mins=energy["en_mins"],
             en_maxs=energy["en_maxs"],
-            en_bins=energy["en_bins"],
+            en_bins=energy["bin_size"],
         )
 
         arr = cfg["array"]["type"]

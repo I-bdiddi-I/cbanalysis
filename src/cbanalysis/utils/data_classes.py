@@ -132,10 +132,10 @@ class EfficiencyProcessingConfig:
                    Minimum log10(E/eV) energy for binning.
     :param en_max: float
                    Maximum log10(E/eV) energy for binning.
-    :param en_bins: int
-                    Number of energy bins.
+    :param bin_size: float
+                     Size of log10(E/eV) energy bins.
     """
     periods: int
     en_min: float
     en_max: float
-    en_bins: int
+    bin_size: float

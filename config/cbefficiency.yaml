@@ -1,9 +1,11 @@
-# Configuration for the cbefficiency pipeline.
-# This pipeline:
-#   - loads MC thrown energies (geom cuts and full cuts)
-#   - computes detection efficiencies
-#   - optionally splits results into N time periods
-#   - saves efficiency plots and comparison plots
+# Configuration file for the cbefficiency pipeline.
+#
+# This file defines:
+#   - array type (TASD or CBSD)
+#   - MC thrown-energy CSV file paths
+#   - energy binning parameters (min, max, bin_size)
+#   - number of time periods
+#   - output directory structure
 
  array:
    # Choose between:
@@ -12,6 +14,8 @@
    type: "TASD" # or "CBSD"
 
  data:
+   # These are the default file paths for the chosen array.
+   # CLI overrides or interactive prompts may replace these.
    tasd:
      mc_thrown_geomcuts: "output/data/TASD_mc_thrown_geomcuts.csv"
      mc_thrown_fullcuts: "output/data/TASD_mc_thrown_fullcuts.csv"
@@ -21,11 +25,15 @@
      mc_thrown_fullcuts: "output/data/CBSD_mc_thrown_fullcuts.csv"
 
  processing:
+   # Number of time periods to split the efficiency calculation into.
+   # If >1, CLI will prompt for per-period file paths + date ranges.
    periods: 1
+
+   # Energy binning parameters in log10(E/eV)
    energy:
-     en_min: 18.0
-     en_max: 20.3
-     en_bins: 24
+     en_min: 18.0   # minimum log10(E/eV)
+     en_max: 20.3   # maximum log10(E/eV)
+     bin_size: 0.1  # bin width in log10(E/eV)
 
  output:
    base_dir: "output"
