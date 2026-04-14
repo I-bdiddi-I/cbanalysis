@@ -7,9 +7,10 @@ These classes provide a clean, typed interface between:
     - parquet ingestion
     - quality cuts
     - physics modules (binning, aperture, exposure, flux, spectrum)
+    - efficiency calculations
     - output utilities
 
-They intentionally contain *no logic* -- only data. This keeps the pipeline
+They intentionally contain *no logic* -- only data. This keeps the pipelines
 transparent, modular, and easy to reason out.
 """
 
@@ -41,7 +42,7 @@ class ArrayConfig:
 @dataclass
 class SpectrumConfig:
     """
-    Configuration for the physics pipeline: binning, geometry, and run time
+    Configuration for the physics pipeline: binning, geometry, and run time.
 
     :param en_range: np.ndarray
                      Array of log10(E/EeV) bin edges. These define:
@@ -110,11 +111,12 @@ class EfficiencyFilesConfig:
     File paths for MC thrown energy CSVs used in the cbefficiency pipeline.
 
     :param mc_thrown_geomcuts: Path
-                               thrown energy values with geometry cuts (geomcuts) applied
+                               Thrown energy values with geometry cuts (geomcuts) applied
     :param mc_thrown_fullcuts: Path
-                               thrown energy values with full cuts (fullcuts) applied
+                               Thrown energy values with full cuts (fullcuts) applied
 
-    Note: both files must contain a 'log10(E/eV)' column
+    Note:
+    Both files must contain a 'log10(E/eV)' column
     """
     mc_thrown_geomcuts: Path
     mc_thrown_fullcuts: Path
@@ -127,13 +129,15 @@ class EfficiencyProcessingConfig:
 
     :param periods: int
                     Number of time periods to split the efficiency calculation into.
-                    If >1, the CLI will prompt for per-period file paths and date ranges
+                    If >1, the CLI will prompt for per-period file paths and date ranges.
     :param en_min: float
-                   Minimum log10(E/eV) energy for binning.
+                   Minimum log10(E/eV) energy for binning
     :param en_max: float
-                   Maximum log10(E/eV) energy for binning.
+                   Maximum log10(E/eV) energy for binning
     :param bin_size: float
-                     Size of log10(E/eV) energy bins.
+                     Size of log10(E/eV) energy bins
+                     This pipeline computes:
+                        num_bins = int((en_max - en_min) / bin_size)
     """
     periods: int
     en_min: float
