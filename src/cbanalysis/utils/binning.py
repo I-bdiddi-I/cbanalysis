@@ -1,12 +1,16 @@
 """
 Energy binning utilities in log10(E/eV) space.
 
-This module is intentionally simple: it defines the bin edges, centers, and
-widths used throughout the physics pipeline, and provies histogram helpers
-for MC reconstruction, MC thrown, and data reconstructed energies.
+This module provides:
+    - construction of energy bins from configuration
+    - computation of bin centers and widths
+    - histograming of MC and data log10(E/eV) values
+    - physics-motivated bin filtering (energy threshold + raw MC threshold)
+    - conversion from log10(E/eV) to linear energies and bin widths
 
-All downstream physics (aperture, exposure, flux, spectrum) depends on these
-bins being consistent and reproducible.
+These utilies are shared across multiple pipelines:
+    - cbspec (binning for aperture, exposure, flux, spectrum)
+    - cbefficiency (binning thrown energies for efficiency curves)
 """
 
 import numpy as np
@@ -15,6 +19,7 @@ import numpy as np
 def make_energy_bins(en_range):
     """
     Constructs bin edges, centers, and widths from log10(E/eV) edges.
+
     :param en_range: array-like
                      Bin edges in log10(E/eV)
                      These come directly from YAML
@@ -34,6 +39,7 @@ def make_energy_bins(en_range):
 def histogram_events(log_energy, edges):
     """
     Histogram events into energy bins.
+
     :param log_energy: array-like
                        log10(E/eV) values
     :param edges: array-like
@@ -66,6 +72,7 @@ def histgram_data_per_bin(mc_log_energy, dt_log_energy, mc_thrown_log_energy, ed
     mc_counts = histogram_events(mc_log_energy, edges)
     dt_counts = histogram_events(dt_log_energy, edges)
     mc_thrown_counts = histogram_events(mc_thrown_log_energy, edges)
+
     return mc_counts, dt_counts, mc_thrown_counts
 
 def filter_bins(mc_counts, dt_counts, mc_raw_counts, centers):

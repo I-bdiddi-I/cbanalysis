@@ -96,8 +96,8 @@ def run_cbprocess(
     for k in range(periods):
         start, end = results["period_ranges"][k]
 
-        logger.log_text(f"Period {k}: {int(start):06d} to {int(end):06d}")
-        logger.log_json(event=f"period_ranges_{k}")
+        logger.log_text(f"Period {k+1}: {int(start):06d} to {int(end):06d}")
+        logger.log_json(event=f"period_ranges_{k+1}")
 
         if periods == 1:
             suffix = ""

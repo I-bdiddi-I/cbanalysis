@@ -42,3 +42,4 @@ include = ["cbanalysis*"]
 [project.scripts]
 cbprocess = "cbanalysis.pipelines.cbprocess.cli:main"
 cbspec = "cbanalysis.pipelines.cbspec.cli:main"
+cbefficiency = "cbanalysis.pipelines.cbefficiency.cli:main"

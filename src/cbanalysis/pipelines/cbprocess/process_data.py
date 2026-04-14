@@ -385,7 +385,7 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
                             )
 
                 logger.log_text(
-                    f"Period {k}: MC={len(energy["mc_recon"][k])}, DT={len(energy["dt_recon"][k])}"
+                    f"Period {k+1}: MC={len(energy["mc_recon"][k+1])}, DT={len(energy["dt_recon"][k+1])}"
                 )
 
             # Save all DT that has passed cuts

@@ -1,5 +1,5 @@
 """
-Lightweight text + JSON logging for a single cbspec pipeline run.
+Lightweight text + JSON logging for the entire cbanalysis project.
 
 This module provides the RunLogger class, which writes:
     - A human-readable text log:

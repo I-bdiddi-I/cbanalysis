@@ -26,13 +26,11 @@ The pipeline performs:
 from pathlib import Path
 from datetime import datetime
 
-import numpy as np
-
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning, message="divide by zero encountered in log10")
 
 from .process_data import set_up_energy_array
-from .binning import make_energy_bins, histgram_data_per_bin, filter_bins, energy_conv
+from cbanalysis.utils.binning import make_energy_bins, histgram_data_per_bin, filter_bins, energy_conv
 from .exposure import compute_aperture, compute_exposure
 from .feldman_cousins import feldman_cousins_vector
 from .flux import compute_flux
@@ -47,7 +45,7 @@ from .plotting import (
     mc_thrown_hist,
     dt_hist,
 )
-from .logging_utils import RunLogger
+from cbanalysis.utils.logging_utils import RunLogger
 
 
 # Run directory helper

@@ -1,6 +1,6 @@
 """
 Dataclasses defining the structured configuration objects used throughout
-the cbspec pipeline.
+the cbanalysis project.
 
 These classes provide a clean, typed interface between:
     - YAML configuration
@@ -37,6 +37,7 @@ class ArrayConfig:
     mc_file: Path
     dt_file: Path
 
+
 @dataclass
 class SpectrumConfig:
     """
@@ -62,6 +63,7 @@ class SpectrumConfig:
     generated_solid_angle_sr: float
     run_time_s: float
 
+
 @dataclass
 class QualityCuts:
     """
@@ -79,6 +81,7 @@ class QualityCuts:
     ldf_chi2: float
     ped_error: float
     frac_s800: float
+
 
 @dataclass
 class OutputConfig:
@@ -99,3 +102,40 @@ class OutputConfig:
     plots_dir: Path
     logs_dir: Path
     runs_dir: Path
+
+
+@dataclass
+class EfficiencyFilesConfig:
+    """
+    File paths for MC thrown energy CSVs used in the cbefficiency pipeline.
+
+    :param mc_thrown_geomcuts: Path
+                               thrown energy values with geometry cuts (geomcuts) applied
+    :param mc_thrown_fullcuts: Path
+                               thrown energy values with full cuts (fullcuts) applied
+
+    Note: both files must contain a 'log10(E/eV)' column
+    """
+    mc_thrown_geomcuts: Path
+    mc_thrown_fullcuts: Path
+
+
+@dataclass
+class EfficiencyProcessingConfig:
+    """
+    Processing configuration for the cbefficiency pipeline.
+
+    :param periods: int
+                    Number of time periods to split the efficiency calculation into.
+                    If >1, the CLI will prompt for per-period file paths and date ranges
+    :param en_min: float
+                   Minimum log10(E/eV) energy for binning.
+    :param en_max: float
+                   Maximum log10(E/eV) energy for binning.
+    :param en_bins: int
+                    Number of energy bins.
+    """
+    periods: int
+    en_min: float
+    en_max: float
+    en_bins: int

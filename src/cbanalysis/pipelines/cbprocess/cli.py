@@ -6,7 +6,7 @@ Usage:
 Options:
     --config path/to/cbprocess.yaml
     --array_type TASD|CBSD
-    --periods int
+    --periods N
 """
 
 import argparse

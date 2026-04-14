@@ -1,0 +1,34 @@
+# Configuration for the cbefficiency pipeline.
+# This pipeline:
+#   - loads MC thrown energies (geom cuts and full cuts)
+#   - computes detection efficiencies
+#   - optionally splits results into N time periods
+#   - saves efficiency plots and comparison plots
+
+ array:
+   # Choose between:
+   #   "TASD" - full Telescope Array surface detector
+   #   "CBSD" - checkerboarded Telescope Array surface detector (every-other detector)
+   type: "TASD" # or "CBSD"
+
+ data:
+   tasd:
+     mc_thrown_geomcuts: "output/data/TASD_mc_thrown_geomcuts.csv"
+     mc_thrown_fullcuts: "output/data/TASD_mc_thrown_fullcuts.csv"
+
+   cbsd:
+     mc_thrown_geomcuts: "output/data/CBSD_mc_thrown_geomcuts.csv"
+     mc_thrown_fullcuts: "output/data/CBSD_mc_thrown_fullcuts.csv"
+
+ processing:
+   periods: 1
+   energy:
+     en_min: 18.0
+     en_max: 20.3
+     en_bins: 24
+
+ output:
+   base_dir: "output"
+   plots_dir: "output/plots"
+   logs_dir: "output/logs"
+   runs_dir: "output/runs"
