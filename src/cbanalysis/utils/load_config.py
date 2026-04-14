@@ -1,10 +1,10 @@
 """
-Unified configuration loader for cbanalysis project.
+Centralized YAML configuration loader for all cbanalysis pipelines.
 
 This loader:
     - Reads a YAML configuration file
     - Detects which pipeline it belongs to
-    - Contructs the appropriate dataclasses
+    - Constructs the appropriate dataclasses
     - Returns a consistent tuple so the pipelines do not break
 
 cbprocess.yaml must contain:
@@ -83,7 +83,7 @@ def load_config(config_path: Path):
 
     if not (is_cbprocess or is_cbspec or is_cbefficiency):
         raise ValueError(
-           f"Configuration file {config_path} does not match cbprocess, cbspec, or cbefficiency schema."
+           f"Configuration file {config_path} does not match any cbanalysis pipeline schema."
         )
 
     # cbprocess branch
@@ -152,9 +152,9 @@ def load_config(config_path: Path):
         energy = proc["energy"]
         eff_proc_cfg = EfficiencyProcessingConfig(
             periods=proc["periods"],
-            en_mins=energy["en_mins"],
-            en_maxs=energy["en_maxs"],
-            en_bins=energy["bin_size"],
+            en_min=energy["en_min"],
+            en_max=energy["en_max"],
+            bin_size=energy["bin_size"],
         )
 
         arr = cfg["array"]["type"]
