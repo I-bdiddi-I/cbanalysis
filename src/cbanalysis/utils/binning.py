@@ -16,6 +16,7 @@ These utilies are shared across multiple pipelines:
 import numpy as np
 
 
+# Binning from explicit edges (used by cbspec)
 def make_energy_bins(en_range):
     """
     Constructs bin edges, centers, and widths from log10(E/eV) edges.
@@ -36,6 +37,35 @@ def make_energy_bins(en_range):
     return edges, centers, widths
 
 
+# Binning from min / max / bin_size (used by cbefficiency)
+def make_energy_bins_from_min_max_size(en_min, en_max, bin_size):
+    """
+    Construct energy bin edges, centers, and widths from:
+        - minimum log10(E/eV)
+        - maximum log10(E/eV)
+        - bin size in log10(E/eV)
+
+    :param en_min: float
+                   Minimum log10(E/eV)
+    :param en_max: float
+                   Maximum log10(E/eV)
+    :param bin_size: float
+                     Width of each bin in log10(E/eV)
+    :return edges: np.ndarray
+                   Bin edges in log10(E/eV)
+    :return centers: np.ndarray
+                     Bin centers in log10(E/eV)
+    :return widths: np.ndarray
+                    Bin widths in log10(E/eV)
+    """
+    num_bins = int((en_max - en_min) / bin_size)
+    edges = np.linspace(en_min, en_max, num_bins + 1)
+    centers = 0.5 * (edges[1:] + edges[:-1])
+    widths = edges[1:] - edges[:-1]
+    return edges, centers, widths
+
+
+# Histogram utilities
 def histogram_events(log_energy, edges):
     """
     Histogram events into energy bins.
@@ -50,10 +80,11 @@ def histogram_events(log_energy, edges):
     counts, _ = np.histogram(log_energy, bins=edges)
     return counts
 
-
+# (used in cbspec)
 def histgram_data_per_bin(mc_log_energy, dt_log_energy, mc_thrown_log_energy, edges):
     """
     Histogram MC reconstructed, data reconstructed, and MC thrown energies into energy bins.
+
     :param mc_log_energy: array-like
                           Reconstructed MC log10(E/eV)
     :param dt_log_energy: array-like
@@ -75,6 +106,8 @@ def histgram_data_per_bin(mc_log_energy, dt_log_energy, mc_thrown_log_energy, ed
 
     return mc_counts, dt_counts, mc_thrown_counts
 
+
+# Physics-motivated bin filtering (used in cbspec)
 def filter_bins(mc_counts, dt_counts, mc_raw_counts, centers):
     """
     Apply physics-motivated bin filters:
@@ -88,7 +121,8 @@ def filter_bins(mc_counts, dt_counts, mc_raw_counts, centers):
             meaningful
 
     These filters ensure that downstream modules (exposure, flux, spectrum,
-    plotting) only see physically valid bins
+    plotting) only see physically valid bins.
+
     :param mc_counts: np.ndarray
                       Reconstructed MC counts per bin
     :param dt_counts: np.ndarray
@@ -131,9 +165,21 @@ def filter_bins(mc_counts, dt_counts, mc_raw_counts, centers):
     )
 
 
+# Conversion to linear energy
 def energy_conv(centers, widths):
+    """
+    Convert log10(E/eV) bin centers and widths to linear energies (eV)
+    and linear bin widths (ΔE).
+    :param centers: array-like
+                    Bin centers in log10(E/eV)
+    :param widths: array-like
+                   Bin widths in log10(E/eV)
+    :return energies_ev: np.ndarray
+                         Linear energies in eV
+    :return delta_energies_ev: np.ndarray
+                               Linear bin widths in eV
+    """
     energies_ev = 10. ** np.asarray(centers, dtype=float)
-
     delta_energies_ev = energies_ev * (10 ** (widths / 2) - 10 ** (-widths / 2))
 
     return energies_ev, delta_energies_ev
