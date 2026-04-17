@@ -25,7 +25,7 @@ import awkward as ak
 
 from cbanalysis.utils.data_classes import ArrayConfig, SpectrumConfig, QualityCuts, OutputConfig
 from cbanalysis.utils.logging_utils import RunLogger
-#from cbanalysis.utils.output_utils import save_processed_arrays_csv
+from cbanalysis.utils.output_utils import save_data_csv, period_suffix
 from .process_data import set_up_energy_array
 
 import warnings
@@ -37,11 +37,20 @@ warnings.filterwarnings(
 
 
 def _make_run_dir(output_cfg: OutputConfig):
+    """
+    Create run directory and logs directory
+
+    Notes:
+        - Mirrors the structure used by all pipelines
+        - Ensures run/data and run/logs exist
+    """
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = output_cfg.runs_dir / timestamp
     logs_dir = run_dir / "logs"
+
     (run_dir / "data").mkdir(parents=True, exist_ok=True)
     logs_dir.mkdir(parents=True, exist_ok=True)
+
     return run_dir, logs_dir
 
 def run_cbprocess(
@@ -52,13 +61,14 @@ def run_cbprocess(
         cfg: dict,
 ):
 
+    # 1. Run directory + logger
     run_dir, logs_dir = _make_run_dir(output_cfg)
     logger = RunLogger(logs_dir)
 
     logger.log_text("Starting cbprocess pipeline...")
     logger.log_json(event="start_cbprocess", array=array_cfg.array_type)
 
-    # Select MC/DT files based on array type
+    # 2. Select MC/DT files based on array type
     logger.log_text("Determining array type for cbprocess...")
     logger.log_json(event="type_select")
     if array_cfg.array_type == "TASD":
@@ -73,7 +83,7 @@ def run_cbprocess(
     logger.log_text(f"Array type: {array_cfg.array_type}")
     logger.log_json(event=f"{array_cfg.array_type}_array_selected", array=array_cfg.array_type)
 
-    # Parquet ingestion (MC + data)
+    # 3. Parquet ingestion (MC + data)
     logger.log_text("Reading parquet files and applying quality cuts...")
     logger.log_json(event="parquet_ingest")
 
@@ -92,73 +102,87 @@ def run_cbprocess(
     logger.log_text(f"Saving results ...")
     logger.log_json(event="save_results")
 
-    # Save period-split CSVs
+    # 4. Save period-split CSVs
+    logger.log_text("Saving results ...")
+    logger.log_json(event="save_results")
+
     for k in range(periods):
         start, end = results["period_ranges"][k]
+
+        # Convert to universal period format (yymmdd strings)
+        period_range = None if periods == 1 else (
+            f"{int(start):06d}",
+            f"{int(end):06d}",
+        )
 
         logger.log_text(f"Period {k+1}: {int(start):06d} to {int(end):06d}")
         logger.log_json(event=f"period_ranges_{k+1}")
 
-        if periods == 1:
-            suffix = ""
-
-        else:
-            suffix = f"_{int(start):06d}_{int(end):06d}"
-
-        # MC reconstructed energies (full cuts)
-        mc_filename = f"{array_cfg.array_type}_mc_recon_cut{suffix}.csv"
-        pd.DataFrame({"log10(E/eV)": energy["mc_recon"][k]}).to_csv(
-            output_cfg.base_dir / "data" / mc_filename, index=False
-        )
-        pd.DataFrame({"log10(E/eV)": energy["mc_recon"][k]}).to_csv(
-            run_dir / "data" / mc_filename, index=False
+        # MC reconstructed energies
+        mc_filename = period_suffix(array_cfg.array_type, "mc_recon_cut", period_range)
+        save_data_csv(
+            output_cfg.base_dir,
+            run_dir,
+            mc_filename,
+            {"log10(E/eV)": energy["mc_recon"][k]},
+            logger,
         )
 
-        # Data reconstructed energies (full cuts)
-        dt_filename = f"{array_cfg.array_type}_data_recon_cut{suffix}.csv"
-        pd.DataFrame({"log10(E/eV)": energy["dt_recon"][k]}).to_csv(
-            output_cfg.base_dir / "data" / dt_filename, index=False
-        )
-        pd.DataFrame({"log10(E/eV)": energy["dt_recon"][k]}).to_csv(
-            run_dir / "data" / dt_filename, index=False
+        # Data reconstructed energies
+        dt_filename = period_suffix(array_cfg.array_type, "data_recon_cut", period_range)
+        save_data_csv(
+            output_cfg.base_dir,
+            run_dir,
+            dt_filename,
+            {"log10(E/eV)": energy["dt_recon"][k]},
+            logger,
         )
 
         # MC thrown energies (no cuts)
-        thrown_filename = f"{array_cfg.array_type}_mc_thrown_nocuts{suffix}.csv"
-        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_nocuts"][k]}).to_csv(
-            output_cfg.base_dir / "data" / thrown_filename, index=False
-        )
-        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_nocuts"][k]}).to_csv(
-            run_dir / "data" / thrown_filename, index=False
+        nocuts_filename = period_suffix(array_cfg.array_type, "mc_thrown_nocuts", period_range)
+        save_data_csv(
+            output_cfg.base_dir,
+            run_dir,
+            nocuts_filename,
+            {"log10(E/eV)": energy["mc_thrown_nocuts"][k]},
+            logger,
         )
 
         # MC thrown energies (full cuts)
-        thrown_filename = f"{array_cfg.array_type}_mc_thrown_fullcuts{suffix}.csv"
-        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_fullcuts"][k]}).to_csv(
-            output_cfg.base_dir / "data" / thrown_filename, index=False
-        )
-        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_fullcuts"][k]}).to_csv(
-            run_dir / "data" / thrown_filename, index=False
+        fullcuts_filename = period_suffix(array_cfg.array_type, "mc_thrown_fullcuts", period_range)
+        save_data_csv(
+            output_cfg.base_dir,
+            run_dir,
+            fullcuts_filename,
+            {"log10(E/eV)": energy["mc_thrown_fullcuts"][k]},
+            logger,
         )
 
         # MC thrown energies (geom cuts)
-        geom_filename = f"{array_cfg.array_type}_mc_thrown_geomcuts{suffix}.csv"
-        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_geomcuts"][k]}).to_csv(
-            output_cfg.base_dir / "data" / geom_filename, index=False
-        )
-        pd.DataFrame({"log10(E/eV)": energy["mc_thrown_geomcuts"][k]}).to_csv(
-            run_dir / "data" / geom_filename, index=False
+        geom_filename = period_suffix(array_cfg.array_type, "mc_thrown_geomcuts", period_range)
+        save_data_csv(
+            output_cfg.base_dir,
+            run_dir,
+            geom_filename,
+            {"log10(E/eV)": energy["mc_thrown_geomcuts"][k]},
+            logger,
         )
 
+    # Save pass-cuts data to parquet
     passed_cuts_filename = f"{array_cfg.array_type}_passed_cuts_data.parquet"
-    ak.to_parquet(
-        results["passed_cuts_df"],
-        output_cfg.base_dir / "data" / passed_cuts_filename
-    )
-    ak.to_parquet(
-        results["passed_cuts_df"],
-        run_dir / "data" / passed_cuts_filename
-    )
+
+    global_parquet_path = output_cfg.base_dir / "data" / passed_cuts_filename
+    run_parquet_path = run_dir / "data" / passed_cuts_filename
+
+    # Global save
+    logger.log_text(f"Saving {passed_cuts_filename} to {global_parquet_path}...")
+    logger.log_json(event=f"save{passed_cuts_filename}_global")
+    ak.to_parquet(results["passed_cuts_df"], global_parquet_path)
+
+    # Run-specific save
+    logger.log_text(f"Saving {passed_cuts_filename} to {run_parquet_path}...")
+    logger.log_json(event=f"save{passed_cuts_filename}_run")
+    ak.to_parquet(results["passed_cuts_df"], run_parquet_path)
 
     logger.log_text("Saved processed arrays.")
     logger.log_json(event="processed_arrays_saved")

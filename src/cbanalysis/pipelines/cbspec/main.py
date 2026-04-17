@@ -36,7 +36,7 @@ from .feldman_cousins import feldman_cousins_vector
 from .flux import compute_flux
 from .spectrum import flux_to_spectrum
 from .output_utils import save_flux_csv, save_spectrum_csv
-from .plotting import (
+from cbanalysis.utils.plotting import (
     plot_aperture,
     plot_exposure,
     plot_flux,
@@ -230,3 +230,24 @@ def run_pipeline(array_cfg, spectrum_cfg, cuts_cfg, output_cfg, cfg):
         "spectrum_lower": spectrum_lower,
         "spectrum_upper": spectrum_upper,
     }
+
+"""
+Flux
+df = pd.DataFrame({
+        "Energy": centers,
+        "Bin_size": widths,
+        "N_events": n_events,
+        "Exposure": exposure,
+        "J": flux,
+        "Lower": flux_lower,
+        "Upper": flux_upper,
+    })
+    
+Spectrum
+df = pd.DataFrame({
+        "Energy": centers,
+        "Spectrum": spectrum,
+        "Lower": spectrum_lower,
+        "Upper": spectrum_upper,
+    })
+"""

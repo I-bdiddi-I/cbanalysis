@@ -81,7 +81,7 @@ def apply_quality_cuts(
     # Fractional S800
     fs800 = dsc / sc
 
-    # Pedestal error
+    # Pointing direction error
     pderr = df["pderr"].str[s]
 
     # Boolean mask for all cuts
@@ -189,7 +189,7 @@ def process_batch(df, array_type, j_index, cuts: QualityCuts, batch_idx, logger:
         geom_mask = (
                 (df["theta_corr"] < cuts.theta_deg) &
                 (bdist >= cuts.boarder_dist_m)
-        )
+        ) # Note: need to cut based on mctheta and mcbdist
         thrown_geomcuts = df.loc[geom_mask, "mclogen"]
     else:
         thrown_nocuts = pd.Series([], dtype=float)
@@ -385,7 +385,7 @@ def set_up_energy_array(infiles, array_type, cuts: QualityCuts, logger: RunLogge
                             )
 
                 logger.log_text(
-                    f"Period {k+1}: MC={len(energy["mc_recon"][k+1])}, DT={len(energy["dt_recon"][k+1])}"
+                    f"Period {k+1}: MC={len(energy["mc_recon"][k])}, DT={len(energy["dt_recon"][k])}"
                 )
 
             # Save all DT that has passed cuts
