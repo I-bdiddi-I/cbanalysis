@@ -18,14 +18,13 @@ This pipeline:
 """
 
 from pathlib import Path
-from datetime import datetime
 import numpy as np
 import pandas as pd
 import awkward as ak
 
 from cbanalysis.utils.data_classes import ArrayConfig, SpectrumConfig, QualityCuts, OutputConfig
 from cbanalysis.utils.logging_utils import RunLogger
-from cbanalysis.utils.output_utils import save_data_csv, period_suffix
+from cbanalysis.utils.output_utils import save_data_csv, period_suffix, make_run_dir
 from .process_data import set_up_energy_array
 
 import warnings
@@ -36,41 +35,34 @@ warnings.filterwarnings(
 )
 
 
-def _make_run_dir(output_cfg: OutputConfig):
-    """
-    Create run directory and logs directory
-
-    Notes:
-        - Mirrors the structure used by all pipelines
-        - Ensures run/data and run/logs exist
-    """
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_dir = output_cfg.runs_dir / timestamp
-    logs_dir = run_dir / "logs"
-
-    (run_dir / "data").mkdir(parents=True, exist_ok=True)
-    logs_dir.mkdir(parents=True, exist_ok=True)
-
-    return run_dir, logs_dir
-
 def run_cbprocess(
         array_cfg: ArrayConfig,
         spectrum_cfg: SpectrumConfig,
         cuts_cfg: QualityCuts,
         output_cfg: OutputConfig,
         cfg: dict,
+        cli_args=None,
 ):
 
     # 1. Run directory + logger
-    run_dir, logs_dir = _make_run_dir(output_cfg)
-    logger = RunLogger(logs_dir)
+    dirs = make_run_dir(output_cfg.base_dir, "cbprocess")
+
+    run_dir = dirs["run_dir"]
+    run_logs = dirs["logs"]
+    global_base = dirs["global_base"]
+
+    logger = RunLogger(run_logs)
 
     logger.log_text("Starting cbprocess pipeline...")
     logger.log_json(event="start_cbprocess", array=array_cfg.array_type)
 
+    # Log CLI arguments
+    logger.log_cli_arguments(cli_args)
+
     # 2. Select MC/DT files based on array type
     logger.log_text("Determining array type for cbprocess...")
     logger.log_json(event="type_select")
+
     if array_cfg.array_type == "TASD":
         array_cfg.mc_file = Path(cfg["data"]["tasd"]["mc_file"])
         array_cfg.dt_file = Path(cfg["data"]["tasd"]["dt_file"])
@@ -99,9 +91,6 @@ def run_cbprocess(
 
     energy = results["energy"]
 
-    logger.log_text(f"Saving results ...")
-    logger.log_json(event="save_results")
-
     # 4. Save period-split CSVs
     logger.log_text("Saving results ...")
     logger.log_json(event="save_results")
@@ -121,7 +110,7 @@ def run_cbprocess(
         # MC reconstructed energies
         mc_filename = period_suffix(array_cfg.array_type, "mc_recon_cut", period_range)
         save_data_csv(
-            output_cfg.base_dir,
+            global_base,
             run_dir,
             mc_filename,
             {"log10(E/eV)": energy["mc_recon"][k]},
@@ -131,7 +120,7 @@ def run_cbprocess(
         # Data reconstructed energies
         dt_filename = period_suffix(array_cfg.array_type, "data_recon_cut", period_range)
         save_data_csv(
-            output_cfg.base_dir,
+            global_base,
             run_dir,
             dt_filename,
             {"log10(E/eV)": energy["dt_recon"][k]},
@@ -141,7 +130,7 @@ def run_cbprocess(
         # MC thrown energies (no cuts)
         nocuts_filename = period_suffix(array_cfg.array_type, "mc_thrown_nocuts", period_range)
         save_data_csv(
-            output_cfg.base_dir,
+            global_base,
             run_dir,
             nocuts_filename,
             {"log10(E/eV)": energy["mc_thrown_nocuts"][k]},
@@ -151,7 +140,7 @@ def run_cbprocess(
         # MC thrown energies (full cuts)
         fullcuts_filename = period_suffix(array_cfg.array_type, "mc_thrown_fullcuts", period_range)
         save_data_csv(
-            output_cfg.base_dir,
+            global_base,
             run_dir,
             fullcuts_filename,
             {"log10(E/eV)": energy["mc_thrown_fullcuts"][k]},
@@ -161,17 +150,17 @@ def run_cbprocess(
         # MC thrown energies (geom cuts)
         geom_filename = period_suffix(array_cfg.array_type, "mc_thrown_geomcuts", period_range)
         save_data_csv(
-            output_cfg.base_dir,
+            global_base,
             run_dir,
             geom_filename,
             {"log10(E/eV)": energy["mc_thrown_geomcuts"][k]},
             logger,
         )
 
-    # Save pass-cuts data to parquet
+    # 5. Save pass-cuts data to parquet
     passed_cuts_filename = f"{array_cfg.array_type}_passed_cuts_data.parquet"
 
-    global_parquet_path = output_cfg.base_dir / "data" / passed_cuts_filename
+    global_parquet_path = global_base / "data" / passed_cuts_filename
     run_parquet_path = run_dir / "data" / passed_cuts_filename
 
     # Global save

@@ -87,6 +87,33 @@ class RunLogger:
         self.json_file.write(line)
         self.json_file.flush()
 
+    # CLI argument logging
+    def log_cli_arguments(self, cli_args):
+        """
+        Log all CLI arguments passed in both text and JSON formats.
+
+        :param cli_args: argparse.Namespace or dict
+                         Parsed CLI arguments from cli.py
+
+        Notes:
+            - Produces one text log energy listing all arguments
+            - Produces on JSON event per argument for machine readability
+            - Keeps CLI logging consistent across all pipelines
+        """
+        if cli_args is None:
+            return
+
+        # Convert Namespace → dict if needed
+        if not isinstance(cli_args, dict):
+            cli_args = vars(cli_args)
+
+        self.log_text("CLI arguments received:")
+        self.log_json(event="cli_arguments")
+
+        for key, value in cli_args.items():
+            self.log_text(f"  {key}: {value}")
+            self.log_json(event=f"cli_{key}", value=str(value))
+
     # Cleanup
     def close(self):
         """

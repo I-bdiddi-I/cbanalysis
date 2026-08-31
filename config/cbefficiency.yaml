@@ -37,6 +37,3 @@
 
  output:
    base_dir: "output"
-   plots_dir: "output/plots"
-   logs_dir: "output/logs"
-   runs_dir: "output/runs"

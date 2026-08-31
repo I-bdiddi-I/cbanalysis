@@ -3,6 +3,7 @@ Efficiency computation utilities for the cbefficiency pipeline.
 
 This module contains only the physics logic:
     - computing efficiency per energy bin
+    - binomial confidence intervals
     - fitting a smooth efficiency curve
     - detecting where the efficiency curve levels off (plateau energy)
 """

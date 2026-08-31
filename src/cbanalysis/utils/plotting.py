@@ -486,13 +486,13 @@ def plot_efficiency_curve(
     )
 
     if plateau_A is not None:
-        plt.axvline(plateau_A, color="red", linestyle="--", linewidth=1.5, label="Derivative threshold")
+        plt.axvline(plateau_A, color="red", linestyle="--", linewidth=1.5, label=f"Derivative threshold: {plateau_A:.3f}")
 
     if plateau_B is not None:
-        plt.axvline(plateau_B, color="green", linestyle="--", linewidth=1.5, label="Curvature threshold")
+        plt.axvline(plateau_B, color="green", linestyle="--", linewidth=1.5, label=f"Curvature threshold: {plateau_B:.3f}")
 
     if plateau_C is not None:
-        plt.axvline(plateau_C, color="purple", linestyle="--", linewidth=1.5, label="Fraction of max derivative")
+        plt.axvline(plateau_C, color="purple", linestyle="--", linewidth=1.5, label=f"Fraction of max derivative: {plateau_C:.3f}")
 
     plt.xlabel(r"$\log_{10}(E/eV)$")
     plt.ylabel("Efficiency")

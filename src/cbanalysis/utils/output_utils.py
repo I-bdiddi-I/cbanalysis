@@ -3,7 +3,7 @@ Utility functions for saving data products (CSV tables, arrays, plots) for all p
 the cbanalysis project.
 
 This module centralizes:
-    - directory creation
+    - creation of run-specific output directories
     - period-aware filename construction
     - saving CSVs to BOTH global and run-specific directories
     - saving plots to BOTH global and run-specific directories
@@ -13,6 +13,20 @@ It ensures:
     - array-tagged filenames (TASD, CBSD)
     - optional period-tagging (yymmdd_start-yymmdd_end)
     - synchronized global/run outputs
+    - a unified, flexible output directory structure for all pipelines
+
+Directory structure created by make_run_dir():
+
+    output/
+        <pipeline>/
+            runs/
+                <timestamp>/
+                    logs/       # run-specific logs (always created)
+                    [plots/]    # run-specific plots (created on demand)
+                    [data/]     # run-specific CSV/parquet data (created on demand)
+
+Global directories (plots/, data/) are created on demand by save_plot() and
+save_data_csv() when the pipeline actually produces those file types.
 """
 
 
@@ -21,6 +35,8 @@ import numpy as np
 import pandas as pd
 import csv
 import matplotlib.pyplot as plt
+from pathlib import Path
+from datetime import datetime
 
 from .logging_utils import RunLogger
 
@@ -35,8 +51,54 @@ def ensure_dir(path: str):
 
     Notes:
         - Used by all pipelines to guarantee directory existence before writing
+        - Safe to call repeatedly (exist_ok=True)
     """
     os.makedirs(path, exist_ok=True)
+
+
+# Unified output directory creator
+def make_run_dir(base_output_dir: Path, pipeline_name: str):
+    """
+    Create the minimal required output directory structure for a pipeline.
+
+    :param base_output_dir: Path
+                            Root output directory (e.g. Path("output"))
+    :param pipeline_name: str
+                          Name of the pipeline ("cbprocess", "cbspec" "cbefficiency")
+
+    :return: dict
+             {
+                "run_dir": Path,
+                "plots": Path,
+                "data": Path,
+                "logs": Path,
+                "global_plots": Path,
+                "global_data": Path,
+             }
+
+    Notes:
+        - This keeps the system flexible: pipelines only create directories for
+          the file types they actually produce
+        - Global logs are intentionally omitted; logs are run-specific only
+    """
+
+    # Base pipeline directory
+    pipeline_dir = base_output_dir / pipeline_name
+    runs_dir = pipeline_dir / "runs"
+    runs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Timestamped run directory
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    run_dir = runs_dir / timestamp
+
+    run_logs = run_dir / "logs"
+    run_logs.mkdir(parents=True, exist_ok=True)
+
+    return {
+        "run_dir": run_dir,
+        "logs": run_logs,
+        "global_base": pipeline_dir
+    }
 
 
 # Period-aware filename helper
@@ -95,14 +157,14 @@ def period_suffix_and_title(array_type, base_title, period_range):
     return suffix, title
 
 
-# Shared save function (global + run)
+# Shared saving utilities (global + run)
 def save_plot(global_output_dir, run_output_dir, filename, logger: RunLogger):
     """
     Saves plots to both global and run-specific output directories.
 
-    :param global_output_dir: str or Path
+    :param global_output_dir: Path or str
                               Base directory for global outputs
-    :param run_output_dir: str or Path
+    :param run_output_dir: Path or None
                            Base directory for run-specific outputs
     :param filename: str
                      Name of the file to save (e.g., "TASD_flux.png")
@@ -113,41 +175,38 @@ def save_plot(global_output_dir, run_output_dir, filename, logger: RunLogger):
         - This function does not modify filenames
         - It simply writes the same file to two locations
     """
-    global_plot_dir = os.path.join(global_output_dir, "plots")
-    run_plot_dir = os.path.join(run_output_dir, "plots")
 
+    # Global plots directory
+    global_plot_dir = Path(global_output_dir) / "plots"
     ensure_dir(global_plot_dir)
-    ensure_dir(run_plot_dir)
-
-    global_path = os.path.join(global_plot_dir, filename)
-    run_path = os.path.join(run_plot_dir, filename)
 
     logger.log_text(f"Saving {filename} to {global_plot_dir}...")
     logger.log_json(event=f"save_{filename}_global")
-    plt.savefig(global_path)
+    plt.savefig(global_plot_dir / filename)
 
-    logger.log_text(f"Saving {filename} to {run_plot_dir}...")
-    logger.log_json(event=f"save_{filename}_run")
-    plt.savefig(run_path)
+    # Run-specific plots directory
+    if run_output_dir is not None:
+        run_plot_dir = Path(run_output_dir) / "plots"
+        ensure_dir(run_plot_dir)
+
+        logger.log_text(f"Saving {filename} to {run_plot_dir}...")
+        logger.log_json(event=f"save_{filename}_run")
+        plt.savefig(run_plot_dir / filename)
 
 
 def save_data_csv(
-        global_output_dir: str,
-        run_output_dir: str,
-        filename: str,
+        global_output_dir,
+        run_output_dir,
+        filename,
         columns: dict,
         logger: RunLogger,
 ):
     """
-    General-purpose CSV writer for all pipelines
+    Saves CSVs to both global and run-specific output directories.
 
-    It writes a CSV with arbitrary columns to BOTH:
-        - global_output_dir/data/
-        - run_output_dir/data/
-
-    :param global_output_dir: str
+    :param global_output_dir: Path or str
                               Path to global output directory
-    :param run_output_dir: str
+    :param run_output_dir: Path or None
                            Path to run-specific output directory
     :param filename: str
                      Exact filename to write (e.g., "TASD_flux.csv")
@@ -170,30 +229,29 @@ def save_data_csv(
         - Period tagging is handled BEFORE calling this function
     """
 
-    # Ensure directories exist
-    global_data_dir = os.path.join(global_output_dir, "data")
-    run_data_dir = os.path.join(run_output_dir, "data")
-    ensure_dir(global_data_dir)
-    ensure_dir(run_data_dir)
-
     # Construct DataFrame
     df = pd.DataFrame(columns)
 
-    # Paths
-    global_path = os.path.join(global_data_dir, filename)
-    run_path = os.path.join(run_data_dir, filename)
+    # Global data directory
+    global_data_dir = Path(global_output_dir) / "data"
+    ensure_dir(global_data_dir)
+    global_path = global_output_dir / filename
 
-    # Save global
     logger.log_text(f"Saving {filename} to {global_path}...")
     logger.log_json(event=f"save_{filename}_global")
     df.to_csv(global_path, index=False)
 
-    # Save run-specific
-    logger.log_text(f"Saving {filename} to {run_path}...")
-    logger.log_json(event=f"save_{filename}_run")
-    df.to_csv(run_path, index=False)
+    # Run-specific data directory
+    if run_output_dir is not None:
+        run_data_dir = Path(run_output_dir) / "data"
+        ensure_dir(run_data_dir)
+        run_path = run_output_dir / filename
 
-    return global_path, run_path
+        logger.log_text(f"Saving {filename} to {run_path}...")
+        logger.log_json(event=f"save_{filename}_run")
+        df.to_csv(run_path, index=False)
+
+    return global_path, (run_path if run_output_dir is not None else None)
 
 
 
