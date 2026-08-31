@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cbanalysis"
-version = "0.1.0"
-description = "A project pipeline to perform TA-style analysis on TA cosmic ray data."
+version = "0.2.0"
+description = "Interactive and pipeline-based analysis framework for TA-style cosmic ray data."
 authors = [
     { name = "Robert D'Avignon", email = "rjdavignon@outlook.com" }
 ]
@@ -28,8 +28,13 @@ dependencies = [
     "pyyaml",
     "tqdm",
     "tabulate",
-    # FCpy installed from GitHub
     "FCpy @ git+https://github.com/usnistgov/FCpy",
+]
+
+[project.optional-dependencies]
+interactive = [
+    "ipython",
+    "jupyterlab",
 ]
 
 [tool.setuptools]
